@@ -15,23 +15,35 @@ The agent has a headless Chrome browser, so it can actually visit GitHub, read d
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────┐
-│  Railway (always-on)                      │
-│                                           │
-│  Hermes Agent                             │
-│  ├── LLM provider (your choice)          │
-│  ├── Telegram gateway                    │
-│  ├── Cron scheduler (IST)               │
-│  ├── Headless Chrome (agent-browser)     │
-│  ├── SOUL.md (agent identity/persona)    │
-│  └── MEMORY.md (persistent knowledge)    │
-│                                           │
-│  Volume: /root/.hermes (persists state)  │
-└────────────────────┬─────────────────────┘
-                     │
-                     ▼
-          You on Telegram (phone/desktop)
+```mermaid
+flowchart TB
+  subgraph railway["Railway (always-on)"]
+    subgraph hermes["Hermes Agent"]
+      LLM[LLM Provider]
+      TG[Telegram Gateway]
+      CRON[Cron Scheduler]
+      BROWSER[Headless Chrome]
+      SOUL[SOUL.md — identity]
+      MEM[MEMORY.md — knowledge]
+    end
+    VOL[(Volume: /root/.hermes)]
+  end
+
+  subgraph external["External"]
+    USER[You on Telegram]
+    GH[GitHub / Web]
+    PROVIDER[Claude / OpenRouter / Bedrock]
+  end
+
+  USER <-->|chat| TG
+  CRON -->|scheduled prompts| LLM
+  LLM -->|API calls| PROVIDER
+  LLM -->|browse| BROWSER
+  BROWSER -->|scrape & research| GH
+  TG -->|messages| LLM
+  hermes --- VOL
+  SOUL -.->|persona| LLM
+  MEM -.->|context| LLM
 ```
 
 ## Prerequisites
