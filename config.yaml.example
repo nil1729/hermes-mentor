@@ -1,0 +1,38 @@
+# Model Configuration
+# Adjust the model and provider based on your setup.
+# Supported providers: bedrock, anthropic, openrouter, openai, ollama, custom
+# See Hermes docs for full provider list.
+model:
+  default: "anthropic/claude-sonnet-4.6"
+  provider: "auto"
+  # For Bedrock:
+  # default: "global.anthropic.claude-opus-4-6-v1"
+  # provider: "bedrock"
+  # region: "us-west-2"
+
+telegram:
+  enabled: true
+
+platforms:
+  telegram:
+    enabled: true
+    # Uncomment and set your chat ID for cron delivery:
+    # home_channel:
+    #   platform: "telegram"
+    #   chat_id: "YOUR_CHAT_ID"
+    #   name: "Your Name"
+
+timezone: "Asia/Kolkata"
+
+display:
+  personality: "mentor"
+
+personalities:
+  mentor:
+    description: "Technical mentor"
+    system_prompt: |
+      You are a technical mentor. Your behavior and expertise areas are defined in SOUL.md.
+      Follow the instructions there for how to interact, what topics to cover, and how to challenge the user.
+      Be concise on Telegram — short messages, code blocks, links.
+    tone: "direct, technically deep"
+    style: "concise paragraphs, code examples, bullet points"

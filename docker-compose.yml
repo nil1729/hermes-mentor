@@ -1,0 +1,14 @@
+services:
+  hermes:
+    build: .
+    container_name: hermes-mentor
+    stdin_open: true
+    tty: true
+    env_file:
+      - .env
+    volumes:
+      - hermes-data:/root/.hermes
+    restart: unless-stopped
+
+volumes:
+  hermes-data:
