@@ -10,6 +10,22 @@ if [ ! -f /root/.hermes/MEMORY.md ]; then
   cp /root/.hermes-config/MEMORY.md /root/.hermes/MEMORY.md
 fi
 
+# Git identity from env vars (persists in volume via ~/.gitconfig)
+if [ -n "$GIT_USER_NAME" ] && [ -n "$GIT_USER_EMAIL" ]; then
+  git config --global user.name "$GIT_USER_NAME"
+  git config --global user.email "$GIT_USER_EMAIL"
+fi
+
+# GitHub auth via token — lets Hermes clone, push, browse repos
+if [ -n "$GITHUB_TOKEN" ]; then
+  git config --global credential.https://github.com.helper \
+    '!f() { echo "username=x-access-token"; echo "password='$GITHUB_TOKEN'"; }; f'
+  echo "[entrypoint] GitHub credential helper configured."
+fi
+
+# Workspace for repos on the persistent volume
+mkdir -p /root/.hermes/workspace
+
 # Create cron jobs (idempotent — checks if they exist first)
 EXISTING=$(hermes cron list 2>/dev/null | grep -c "morning-brief" || true)
 if [ "$EXISTING" -eq "0" ]; then
