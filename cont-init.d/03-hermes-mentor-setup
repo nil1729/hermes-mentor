@@ -24,7 +24,43 @@ cp /opt/hermes-mentor/scripts/storage-cleanup.sh "$HERMES_HOME/scripts/storage-c
 chown -R hermes:hermes "$HERMES_HOME/scripts"
 chmod 755 "$HERMES_HOME/scripts/storage-cleanup.sh"
 
-# --- Extra mentor-specific ownership fixes ---
+# --- One-time migration: hand the whole volume over to hermes ---
+# Every deploy of this repo before commit 1f9646d ("move to Hermes docker
+# image") ran on a plain `ubuntu:24.04` base with no s6-overlay and no
+# privilege-drop concept at all -- ENV HOME=/root, CMD ["/root/entrypoint.sh"],
+# the entire container (install, entrypoint, the agent process itself) ran
+# as root, full stop, for the whole life of the deployment from the very
+# first commit (886a000, May 2026) until the switch to the official
+# nousresearch/hermes-agent image this morning.
+#
+# That means EVERY file already on this volume before that switch --
+# repos/, kanban.db, MEMORY.md, state.db, all of it -- was written by a
+# fully-root container. It isn't a handful of directories poisoned by an
+# occasional `docker exec <c> hermes ...` call (that's the ongoing,
+# small-scale case the targeted per-directory fixes below still guard
+# against going forward); it's the ENTIRE pre-existing volume, one single
+# historical fact, not scattered bugs. The right fix for a one-time
+# regime change is a one-time full chown, not more per-directory
+# allowlist entries.
+#
+# Marker-gated so this recursive chown -R (real cost: hundreds of repo
+# files + an ~900MB state.db as of the migration) runs exactly ONCE, not
+# on every future boot -- unlike the targeted per-directory checks below,
+# which stay cheap forever specifically because they're scoped to a
+# couple of small dirs.
+MIGRATION_MARKER="$HERMES_HOME/.migrated_to_hermes_uid_20260925"
+if [ ! -f "$MIGRATION_MARKER" ]; then
+  echo "[hermes-mentor] One-time migration: chowning $HERMES_HOME to hermes:hermes (pre-s6-overlay volume was entirely root-owned)..."
+  if chown -R hermes:hermes "$HERMES_HOME" 2>/dev/null; then
+    date -u +"%Y-%m-%dT%H:%M:%SZ" > "$MIGRATION_MARKER"
+    chown hermes:hermes "$MIGRATION_MARKER"
+    echo "[hermes-mentor] Migration complete."
+  else
+    echo "[hermes-mentor] Warning: full-volume chown failed (rootless container?) -- some files may remain root-owned. Not writing the marker, will retry next boot."
+  fi
+fi
+
+# --- Extra mentor-specific ownership fixes (ongoing, cheap, every boot) ---
 # The official image's stage2-hook.sh deliberately does NOT blanket-chown
 # $HERMES_HOME (it only fixes a documented allowlist: cron, sessions, logs,
 # profiles, pairing, etc. -- see its own comments re: issue #19788, so a
