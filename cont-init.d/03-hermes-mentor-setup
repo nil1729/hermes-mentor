@@ -1,0 +1,62 @@
+#!/command/with-contenv sh
+# Hermes Mentor customizations, layered on top of the official image's own
+# cont-init.d chain (runs after 01-hermes-setup / 02-reconcile-profiles, so
+# $HERMES_HOME already exists and is hermes-owned). Config/identity/cron are
+# idempotent and safe to re-run on every boot.
+set -e
+
+HERMES_HOME="${HERMES_HOME:-/opt/data}"
+GITCONFIG="$HERMES_HOME/.gitconfig"
+
+# config.yaml/SOUL.md are centrally managed in this repo's image — always
+# overwrite from the image, unlike the official seed_one (first-boot only).
+cp /opt/hermes-mentor/config.yaml "$HERMES_HOME/config.yaml"
+cp /opt/hermes-mentor/SOUL.md "$HERMES_HOME/SOUL.md"
+chown hermes:hermes "$HERMES_HOME/config.yaml" "$HERMES_HOME/SOUL.md"
+chmod 640 "$HERMES_HOME/config.yaml"
+
+# MEMORY.md is updated by the agent over time — seed once, never overwrite.
+if [ ! -f "$HERMES_HOME/MEMORY.md" ]; then
+  cp /opt/hermes-mentor/MEMORY.md "$HERMES_HOME/MEMORY.md"
+  chown hermes:hermes "$HERMES_HOME/MEMORY.md"
+fi
+
+# Git identity from env vars, written directly to the volume's .gitconfig
+# (main-wrapper.sh sets HOME=/opt/data for the hermes user at runtime, so
+# this is the file git actually reads).
+if [ -n "${GIT_USER_NAME:-}" ] && [ -n "${GIT_USER_EMAIL:-}" ]; then
+  git config --file "$GITCONFIG" user.name "$GIT_USER_NAME"
+  git config --file "$GITCONFIG" user.email "$GIT_USER_EMAIL"
+fi
+
+# GitHub auth via token — lets Hermes clone, push, browse repos.
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+  git config --file "$GITCONFIG" credential.https://github.com.helper \
+    "!f() { echo username=x-access-token; echo password=\$GITHUB_TOKEN; }; f"
+  echo "[hermes-mentor] GitHub credential helper configured."
+fi
+[ -f "$GITCONFIG" ] && chown hermes:hermes "$GITCONFIG"
+
+# Idempotent cron jobs. `hermes` is the privilege-drop shim (root -> hermes).
+if [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
+  EXISTING=$(hermes cron list 2>/dev/null | grep -c "morning-brief" || true)
+  if [ "$EXISTING" -eq 0 ]; then
+    echo "[hermes-mentor] Creating cron jobs..."
+
+    hermes cron create "0 8 * * *" \
+      "You are Nilanjan's technical mentor. Use your browser to check recent activity on github.com/facebookincubator/velox, github.com/apache/spark, and github.com/apache/arrow. Send a morning brief with: 1) A side project idea related to data platforms or query engines that would make a good OSS contribution. 2) One interesting open issue or PR you found from those repos that matches a 3-year-exp engineer learning C++. 3) A concept to study today with a specific link. Keep it actionable and under 300 words." \
+      --name "morning-brief" --deliver "telegram:${TELEGRAM_CHAT_ID}"
+
+    hermes cron create "0 14 * * *" \
+      "You are Nilanjan's technical mentor. Send ONE deep-dive learning nugget. Pick a topic from: distributed systems internals, query engine design (Velox/Gluten/Spark/Arrow), database storage engines, AI inference optimization, or data platform architecture. Go DEEP on one specific concept — explain the 'why' behind the design, not just the 'what'. Include: 1) The core insight (2-3 sentences), 2) Where to see it in code (specific repo, file, function — use your browser to verify the link works), 3) One small experiment to solidify understanding. Under 250 words." \
+      --name "daily-deep-dive" --deliver "telegram:${TELEGRAM_CHAT_ID}"
+
+    hermes cron create "0 20 * * 5" \
+      "You are Nilanjan's technical mentor. It's Friday evening — send a weekend project challenge. Use your browser to find a real, specific problem to solve. Pick ONE: build a tiny query engine component, implement a distributed systems paper concept, write a Spark plugin, or build an AI agent tool. Include: what to build, why it's valuable, key repos/files to reference (verify links with browser), and definition of done. Completable in a weekend. Under 400 words." \
+      --name "weekend-challenge" --deliver "telegram:${TELEGRAM_CHAT_ID}"
+
+    echo "[hermes-mentor] Cron jobs created."
+  else
+    echo "[hermes-mentor] Cron jobs already exist, skipping."
+  fi
+fi
