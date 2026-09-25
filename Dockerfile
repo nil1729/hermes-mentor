@@ -5,6 +5,7 @@ FROM nousresearch/hermes-agent:latest
 COPY config.yaml /opt/hermes-mentor/config.yaml
 COPY SOUL.md /opt/hermes-mentor/SOUL.md
 COPY MEMORY.md /opt/hermes-mentor/MEMORY.md
+COPY scripts/storage-cleanup.sh /opt/hermes-mentor/scripts/storage-cleanup.sh
 
 # Runs after the official 01-hermes-setup/02-reconcile-profiles hooks, inside
 # the same s6-overlay cont-init.d chain: config/identity seeding + cron jobs.

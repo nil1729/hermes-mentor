@@ -15,6 +15,15 @@ cp /opt/hermes-mentor/SOUL.md "$HERMES_HOME/SOUL.md"
 chown hermes:hermes "$HERMES_HOME/config.yaml" "$HERMES_HOME/SOUL.md"
 chmod 640 "$HERMES_HOME/config.yaml"
 
+# storage-cleanup.sh must live under $HERMES_HOME/scripts (the cron tool
+# only accepts job scripts relative to that dir) and be hermes-owned, since
+# the hermes user can't write into a root-owned scripts/ dir at runtime.
+# Always overwrite from the image, same policy as config.yaml/SOUL.md.
+mkdir -p "$HERMES_HOME/scripts"
+cp /opt/hermes-mentor/scripts/storage-cleanup.sh "$HERMES_HOME/scripts/storage-cleanup.sh"
+chown -R hermes:hermes "$HERMES_HOME/scripts"
+chmod 755 "$HERMES_HOME/scripts/storage-cleanup.sh"
+
 # MEMORY.md is updated by the agent over time — seed once, never overwrite.
 if [ ! -f "$HERMES_HOME/MEMORY.md" ]; then
   cp /opt/hermes-mentor/MEMORY.md "$HERMES_HOME/MEMORY.md"
