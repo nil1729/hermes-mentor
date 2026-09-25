@@ -24,6 +24,35 @@ cp /opt/hermes-mentor/scripts/storage-cleanup.sh "$HERMES_HOME/scripts/storage-c
 chown -R hermes:hermes "$HERMES_HOME/scripts"
 chmod 755 "$HERMES_HOME/scripts/storage-cleanup.sh"
 
+# --- Extra mentor-specific ownership fixes ---
+# The official image's stage2-hook.sh deliberately does NOT blanket-chown
+# $HERMES_HOME (it only fixes a documented allowlist: cron, sessions, logs,
+# profiles, pairing, etc. -- see its own comments re: issue #19788, so a
+# host bind-mounted volume with unrelated files is never touched). That
+# caveat doesn't apply here: our Railway volume is dedicated to this
+# deployment, nothing else lives on it, so it's safe to extend the same
+# self-healing pattern to a few more dirs the agent genuinely needs to
+# write into at runtime but that land root-owned (same cause as
+# cron/profiles/pairing above: anything touched via `docker exec <c> hermes
+# ...` or created by a root-context maintenance step defaults to uid 0).
+#
+# repos/    -- where the agent clones/pulls project repos directly (git
+#              clone as the hermes user fails outright into a root-owned
+#              parent dir -- hit this live while fixing this very script).
+# vault/    -- local credential vault (browser_vault_* tools). Was 700
+#              root:root, meaning the vault was 100% inaccessible to the
+#              running agent on this deployment -- not a permissions nit,
+#              a fully broken feature.
+for d in repos vault; do
+  if [ -d "$HERMES_HOME/$d" ]; then
+    owner=$(stat -c %U "$HERMES_HOME/$d" 2>/dev/null || echo unknown)
+    if [ "$owner" != "hermes" ]; then
+      chown -R hermes:hermes "$HERMES_HOME/$d" 2>/dev/null || \
+        echo "[hermes-mentor] Warning: could not chown $HERMES_HOME/$d"
+    fi
+  fi
+done
+
 # MEMORY.md is updated by the agent over time — seed once, never overwrite.
 if [ ! -f "$HERMES_HOME/MEMORY.md" ]; then
   cp /opt/hermes-mentor/MEMORY.md "$HERMES_HOME/MEMORY.md"

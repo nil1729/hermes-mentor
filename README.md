@@ -26,7 +26,7 @@ flowchart TB
       SOUL[SOUL.md — identity]
       MEM[MEMORY.md — knowledge]
     end
-    VOL[(Volume: /root/.hermes)]
+    VOL[(Volume: /opt/data)]
   end
 
   subgraph external["External"]
@@ -127,7 +127,7 @@ railway init
 railway link
 
 # Add persistent volume
-railway volume add --mount-path /root/.hermes
+railway volume add --mount-path /opt/data
 
 # Set environment variables
 railway variable set \
@@ -186,7 +186,7 @@ To pick up schedule changes, delete the volume and redeploy (crons are created o
 
 ```bash
 railway volume delete
-railway volume add --mount-path /root/.hermes
+railway volume add --mount-path /opt/data
 railway up -d
 ```
 
@@ -240,7 +240,7 @@ Run it daily (or whenever creds expire).
 
 ## How persistence works
 
-Railway volume at `/root/.hermes` stores:
+Railway volume at `/opt/data` stores:
 - **Sessions** — chat history across conversations
 - **MEMORY.md** — agent-managed, grows over time
 - **Cron jobs** — survive restarts

@@ -7,7 +7,7 @@ services:
     env_file:
       - .env
     volumes:
-      - hermes-data:/root/.hermes
+      - hermes-data:/opt/data
     restart: unless-stopped
 
 volumes:
