@@ -95,19 +95,21 @@ if [ ! -f "$HERMES_HOME/MEMORY.md" ]; then
   chown hermes:hermes "$HERMES_HOME/MEMORY.md"
 fi
 
-# Git identity from env vars, written directly to the volume's .gitconfig
-# (main-wrapper.sh sets HOME=/opt/data for the hermes user at runtime, so
-# this is the file git actually reads).
+GIT_HOME="$(getent passwd hermes | cut -d: -f6)"
+GIT_HOME="${GIT_HOME:-/opt/data/home}"
+GITCONFIG="$GIT_HOME/.gitconfig"
+
 if [ -n "${GIT_USER_NAME:-}" ] && [ -n "${GIT_USER_EMAIL:-}" ]; then
   git config --file "$GITCONFIG" user.name "$GIT_USER_NAME"
   git config --file "$GITCONFIG" user.email "$GIT_USER_EMAIL"
 fi
 
-# GitHub auth via token — lets Hermes clone, push, browse repos.
 if [ -n "${GITHUB_TOKEN:-}" ]; then
-  git config --file "$GITCONFIG" credential.https://github.com.helper \
-    "!f() { echo username=x-access-token; echo password=\$GITHUB_TOKEN; }; f"
-  echo "[hermes-mentor] GitHub credential helper configured."
+  echo "https://x-access-token:*** > "$GIT_HOME/.git-credentials"
+  chmod 600 "$GIT_HOME/.git-credentials"
+  git config --file "$GITCONFIG" credential.helper store
+  chown hermes:hermes "$GIT_HOME/.git-credentials"
+  echo "[hermes-mentor] GitHub credentials written to $GIT_HOME/.git-credentials"
 fi
 [ -f "$GITCONFIG" ] && chown hermes:hermes "$GITCONFIG"
 
