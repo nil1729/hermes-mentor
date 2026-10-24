@@ -95,6 +95,10 @@ if [ ! -f "$HERMES_HOME/MEMORY.md" ]; then
   chown hermes:hermes "$HERMES_HOME/MEMORY.md"
 fi
 
+# Resolve the hermes user's ACTUAL home dir — do NOT assume $HERMES_HOME.
+# (main-wrapper.sh does NOT set HOME=/opt/data; verified live the hermes
+# user's real $HOME is /opt/data/home. Writing git config anywhere else
+# is silently ignored by git.)
 GIT_HOME="$(getent passwd hermes | cut -d: -f6)"
 GIT_HOME="${GIT_HOME:-/opt/data/home}"
 GITCONFIG="$GIT_HOME/.gitconfig"
@@ -104,8 +108,13 @@ if [ -n "${GIT_USER_NAME:-}" ] && [ -n "${GIT_USER_EMAIL:-}" ]; then
   git config --file "$GITCONFIG" user.email "$GIT_USER_EMAIL"
 fi
 
+# GitHub auth via token — lets Hermes clone, push, browse repos.
+# Bake the resolved value into a static credentials file NOW, while root
+# still has it. Do not defer to a live "$GITHUB_TOKEN" shell expansion —
+# the hermes-user cron/runtime process does not reliably inherit this var
+# from the root boot context, so a deferred helper silently no-ops later.
 if [ -n "${GITHUB_TOKEN:-}" ]; then
-  echo "https://x-access-token:*** > "$GIT_HOME/.git-credentials"
+  echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$GIT_HOME/.git-credentials"
   chmod 600 "$GIT_HOME/.git-credentials"
   git config --file "$GITCONFIG" credential.helper store
   chown hermes:hermes "$GIT_HOME/.git-credentials"
@@ -136,3 +145,4 @@ if [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
     echo "[hermes-mentor] Cron jobs already exist, skipping."
   fi
 fi
+
