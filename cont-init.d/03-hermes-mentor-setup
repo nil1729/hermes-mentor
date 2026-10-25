@@ -99,8 +99,11 @@ fi
 # (main-wrapper.sh does NOT set HOME=/opt/data; verified live the hermes
 # user's real $HOME is /opt/data/home. Writing git config anywhere else
 # is silently ignored by git.)
-GIT_HOME="$(getent passwd hermes | cut -d: -f6)"
-GIT_HOME="${GIT_HOME:-/opt/data/home}"
+# NOTE: do NOT use `getent passwd hermes` here — its passwd-entry home dir
+# does not match the actual runtime $HOME for the hermes user (confirmed
+# live: passwd says one thing, the privilege-drop wrapper sets $HOME to
+# $HERMES_HOME/home instead). Hardcode relative to $HERMES_HOME instead.
+GIT_HOME="$HERMES_HOME/home"
 GITCONFIG="$GIT_HOME/.gitconfig"
 
 if [ -n "${GIT_USER_NAME:-}" ] && [ -n "${GIT_USER_EMAIL:-}" ]; then
