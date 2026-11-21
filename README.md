@@ -223,6 +223,33 @@ model:
   provider: "ollama"
 ```
 
+### Notion MCP (optional)
+
+Lets the agent search, read and create Notion pages, e.g. to file deep dives that need offline exploration.
+
+1. Create an internal integration at <https://www.notion.so/profile/integrations> and copy its token.
+2. Create a parent page (e.g. "Mentorship Vault"), open its `•••` menu → **Connections** → add the integration. The agent can only see pages you share this way.
+3. Set the token on Railway and redeploy (the hook only runs at container start):
+
+```bash
+railway variable set NOTION_TOKEN="ntn_..."
+railway up -d      # or: railway service restart
+```
+
+On boot, `cont-init.d/03-hermes-mentor-setup` appends a `notion` entry to `config.yaml` that runs `@notionhq/notion-mcp-server` over stdio. The token is only referenced as `${NOTION_TOKEN}`, so it is never written to the repo or the volume. With `NOTION_TOKEN` unset nothing is added. If your `config.yaml` already has its own `mcp_servers:` block, the hook skips injection and logs a warning — add the entry yourself:
+
+```yaml
+mcp_servers:
+  notion:
+    command: "npx"
+    args: ["-y", "@notionhq/notion-mcp-server@2.6.1"]
+    env:
+      NOTION_TOKEN: "${NOTION_TOKEN}"
+    connect_timeout: 120
+```
+
+Tools show up as `mcp_notion_*`. Check `railway service logs` for `Notion MCP server added to config.yaml`.
+
 ### Credential rotation (for SSO/temporary creds)
 
 If your provider uses temporary credentials (e.g., AWS SSO), create a `refresh-creds.sh` script:

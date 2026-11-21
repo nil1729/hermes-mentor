@@ -15,6 +15,32 @@ cp /opt/hermes-mentor/SOUL.md "$HERMES_HOME/SOUL.md"
 chown hermes:hermes "$HERMES_HOME/config.yaml" "$HERMES_HOME/SOUL.md"
 chmod 640 "$HERMES_HOME/config.yaml"
 
+# --- Optional: Notion MCP, opt-in via the NOTION_TOKEN Railway variable ---
+# Appended here (not committed to config.yaml) so the token never touches the
+# repo or the volume: config.yaml only carries the literal "${NOTION_TOKEN}",
+# which Hermes resolves from the process env when it connects the server
+# (tools/mcp_tool_config.py::_interpolate_env_vars, covers the env: map).
+# Unset NOTION_TOKEN -> nothing is added and no Notion server is started.
+# If config.yaml already defines mcp_servers we leave it alone rather than
+# guess at a YAML merge with plain sh.
+if [ -n "${NOTION_TOKEN:-}" ]; then
+  if grep -q '^mcp_servers:' "$HERMES_HOME/config.yaml"; then
+    echo "[hermes-mentor] NOTION_TOKEN is set but config.yaml already defines mcp_servers; not adding Notion MCP. Add the notion entry there manually (see README)."
+  else
+    cat >> "$HERMES_HOME/config.yaml" <<'MCP_EOF'
+
+mcp_servers:
+  notion:
+    command: "npx"
+    args: ["-y", "@notionhq/notion-mcp-server@2.6.1"]
+    env:
+      NOTION_TOKEN: "${NOTION_TOKEN}"
+    connect_timeout: 120
+MCP_EOF
+    echo "[hermes-mentor] Notion MCP server added to config.yaml (NOTION_TOKEN set)."
+  fi
+fi
+
 # storage-cleanup.sh must live under $HERMES_HOME/scripts (the cron tool
 # only accepts job scripts relative to that dir) and be hermes-owned, since
 # the hermes user can't write into a root-owned scripts/ dir at runtime.
