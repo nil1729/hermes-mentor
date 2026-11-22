@@ -250,6 +250,41 @@ mcp_servers:
 
 Tools show up as `mcp_notion_*`. Check `railway service logs` for `Notion MCP server added to config.yaml`.
 
+### Bifrost LLM gateway (optional, extra provider)
+
+Adds a [Bifrost](https://github.com/maximhq/bifrost) gateway as a second, named provider. The main model (`model.provider`, e.g. direct Bedrock) is **not changed**; the gateway is only used when you pick it.
+
+1. In Bifrost, create a virtual key that allows the providers/models you want (Virtual Keys → Add).
+2. Set these on Railway and redeploy (the hook only runs at container start):
+
+```bash
+railway variable set BIFROST_BASE_URL="https://<your-bifrost-host>"   # /v1 is appended if missing
+railway variable set BIFROST_API_KEY="sk-bf-..."                       # the virtual key
+railway variable set BIFROST_DEFAULT_MODEL="bedrock/<alias-or-profile-id>"   # optional
+railway variable set BIFROST_MODELS="bedrock/<id-1>,bedrock/<id-2>,bedrock/<id-3>"   # optional, see below
+railway up -d      # or: railway service restart
+```
+
+On boot the hook appends a `providers.bifrost` entry (OpenAI-compatible `chat_completions`) to `config.yaml`. The virtual key is only referenced by name (`key_env: BIFROST_API_KEY`), never written to the repo or volume. With `BIFROST_BASE_URL` unset nothing is added. If your `config.yaml` already has its own `providers:` block, the hook skips injection and logs a warning; add the entry yourself:
+
+```yaml
+providers:
+  bifrost:
+    api: "https://<your-bifrost-host>/v1"
+    key_env: BIFROST_API_KEY
+    transport: chat_completions
+    default_model: "bedrock/<alias-or-profile-id>"
+    extra_headers:
+      x-bf-lh-app: "hermes-mentor"   # shows up as a log label in Bifrost
+```
+
+Use it in a chat with `/model custom:bifrost:bedrock/<alias-or-profile-id>`; switch back with `/model` to your normal provider. Check `railway service logs` for `Bifrost provider added to config.yaml`.
+
+Notes:
+- **`/model` shows only one model?** Hermes lists a custom endpoint by probing `GET /models` with a ~1.5s budget (5s for the full picker), and falls back to just `default_model` if the probe is slow or fails. Bifrost's list can be slower than that. Set `BIFROST_MODELS` (comma-separated) to pin the list and skip the probe (`discover_models: false`). The virtual key must still allow each model.
+- Model names are `<bifrost-provider>/<model>`, as Bifrost routes on that prefix.
+- Plain `chat_completions` through a gateway sends no Anthropic `cache_control` markers. For Claude via Bifrost, enable `prompt_cache.auto_inject` on that provider in Bifrost, otherwise long system prompts are re-billed in full each turn.
+
 ### Credential rotation (for SSO/temporary creds)
 
 If your provider uses temporary credentials (e.g., AWS SSO), create a `refresh-creds.sh` script:
