@@ -67,7 +67,7 @@ providers:
     api: "${BIFROST_API_URL}"
     key_env: BIFROST_API_KEY
     transport: chat_completions
-    default_model: "${BIFROST_DEFAULT_MODEL:-bedrock/global.anthropic.claude-opus-5-5}"
+    default_model: "${BIFROST_DEFAULT_MODEL:-bedrock/global.anthropic.claude-sonnet-5-5}"
     extra_headers:
       x-bf-lh-app: "hermes-mentor"
 BIFROST_EOF
