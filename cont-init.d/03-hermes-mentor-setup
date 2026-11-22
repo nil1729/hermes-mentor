@@ -203,6 +203,30 @@ if [ -n "${GITHUB_TOKEN:-}" ]; then
 fi
 [ -f "$GITCONFIG" ] && chown hermes:hermes "$GITCONFIG"
 
+# --- Optional: Hermes web dashboard (sessions, logs, analytics, cron, config) ---
+# The base image already supervises the dashboard under s6 (docker/s6-rc.d/dashboard):
+# it runs `hermes dashboard --host 0.0.0.0 --port ${HERMES_DASHBOARD_PORT:-9119}` in the
+# same container, next to the gateway, only when HERMES_DASHBOARD is truthy. This block
+# adds no process; it is a preflight that explains the misconfigurations that would
+# otherwise surface as a silent restart loop. It never changes boot behaviour.
+# A non-loopback dashboard refuses to start without an auth provider (password or OAuth).
+case "${HERMES_DASHBOARD:-}" in
+  1|true|TRUE|True|yes|YES|Yes)
+    echo "[hermes-mentor] Dashboard enabled (HERMES_DASHBOARD) on port ${HERMES_DASHBOARD_PORT:-9119}."
+    if [ -n "${HERMES_DASHBOARD_OAUTH_CLIENT_ID:-}" ]; then
+      echo "[hermes-mentor] Dashboard auth: OAuth client id set."
+    elif [ -n "${HERMES_DASHBOARD_BASIC_AUTH_USERNAME:-}" ] && \
+         { [ -n "${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD:-}" ] || [ -n "${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH:-}" ]; }; then
+      echo "[hermes-mentor] Dashboard auth: username/password set."
+      if [ -z "${HERMES_DASHBOARD_BASIC_AUTH_SECRET:-}" ]; then
+        echo "[hermes-mentor] Warning: HERMES_DASHBOARD_BASIC_AUTH_SECRET is not set; you will be signed out on every restart. Set 32+ random bytes (openssl rand -base64 32)."
+      fi
+    else
+      echo "[hermes-mentor] Warning: HERMES_DASHBOARD is on but no auth provider is configured. The dashboard will refuse to start (fail closed) and be restarted by s6. Set HERMES_DASHBOARD_BASIC_AUTH_USERNAME + HERMES_DASHBOARD_BASIC_AUTH_PASSWORD (and _SECRET)."
+    fi
+    ;;
+esac
+
 # Idempotent cron jobs. `hermes` is the privilege-drop shim (root -> hermes).
 if [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
   EXISTING=$(hermes cron list 2>/dev/null | grep -c "morning-brief" || true)
