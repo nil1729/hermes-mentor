@@ -76,7 +76,7 @@ BIFROST_EOF
       {
         echo "    discover_models: false"
         echo "    models:"
-        printf '%s' "$BIFROST_MODELS" | tr ',' '\n' | while IFS= read -r m; do
+        printf '%s\n' "$BIFROST_MODELS" | tr ',' '\n' | while IFS= read -r m; do
           m=$(printf '%s' "$m" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
           [ -n "$m" ] && echo "      - $m"
         done
