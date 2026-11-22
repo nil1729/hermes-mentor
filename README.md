@@ -285,6 +285,28 @@ Notes:
 - Model names are `<bifrost-provider>/<model>`, as Bifrost routes on that prefix.
 - Plain `chat_completions` through a gateway sends no Anthropic `cache_control` markers. For Claude via Bifrost, enable `prompt_cache.auto_inject` on that provider in Bifrost, otherwise long system prompts are re-billed in full each turn.
 
+### Web dashboard (optional)
+
+Browser UI for sessions, logs, analytics, cron jobs, skills, MCP and config. It runs **in the same container** as the gateway: the base image already supervises it under s6 (`docker/s6-rc.d/dashboard`) and starts `hermes dashboard --host 0.0.0.0 --port ${HERMES_DASHBOARD_PORT:-9119}` only when `HERMES_DASHBOARD` is truthy. This repo adds no process; the boot hook only logs a preflight so a bad config is visible in `railway service logs`.
+
+Set on Railway and redeploy:
+
+```bash
+railway variable set HERMES_DASHBOARD=1
+railway variable set HERMES_DASHBOARD_BASIC_AUTH_USERNAME="admin"
+railway variable set HERMES_DASHBOARD_BASIC_AUTH_PASSWORD="<strong password>"
+railway variable set HERMES_DASHBOARD_BASIC_AUTH_SECRET="$(openssl rand -base64 32)"   # stable, so logins survive restarts
+# optional: HERMES_DASHBOARD_PORT (default 9119)
+```
+
+Then expose the dashboard port in Railway (generate a domain / map the target port to `HERMES_DASHBOARD_PORT`). Port mapping is not done by this repo.
+
+- A non-loopback dashboard **refuses to start without an auth provider** (fail closed): set the username + password (or `HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH`) or `HERMES_DASHBOARD_OAUTH_CLIENT_ID`. `HERMES_DASHBOARD_INSECURE` is ignored by the image.
+- Check the gate is on: `curl -s https://<domain>/api/status | jq '.auth_required, .auth_providers'` should print `true` and `["basic"]`.
+- **Security:** the dashboard reads/writes `.env` (API keys) and has a terminal Chat tab. Upstream says the username/password provider is for trusted networks and not for direct public-internet exposure; prefer a VPN/Tailscale or Railway private networking in front of it, and use a long random password.
+- Unset `HERMES_DASHBOARD` and redeploy to turn it off; the s6 slot reports down.
+- The dashboard's token/cost analytics are a local lower bound and hidden by default; for LLM spend use the Bifrost Logs tab.
+
 ### Credential rotation (for SSO/temporary creds)
 
 If your provider uses temporary credentials (e.g., AWS SSO), create a `refresh-creds.sh` script:
