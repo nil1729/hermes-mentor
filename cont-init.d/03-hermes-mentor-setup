@@ -41,6 +41,43 @@ MCP_EOF
   fi
 fi
 
+# --- Optional: Bifrost LLM gateway as an EXTRA named provider ---
+# Opt-in on BIFROST_BASE_URL. Adds providers.bifrost next to the existing
+# setup; model.provider (direct Bedrock) is left untouched, so the gateway is
+# only used when selected with `/model custom:bifrost:<model>`. The virtual key
+# is never written here: the entry only names the env var (key_env), which
+# Hermes resolves in-process from BIFROST_API_KEY. The URL is not a secret, so
+# it is baked in. Unset BIFROST_BASE_URL -> nothing is added.
+# If config.yaml already defines providers: we leave it alone (no YAML merge in sh).
+if [ -n "${BIFROST_BASE_URL:-}" ]; then
+  if grep -q '^providers:' "$HERMES_HOME/config.yaml"; then
+    echo "[hermes-mentor] BIFROST_BASE_URL is set but config.yaml already defines providers; not adding Bifrost. Add the bifrost entry there manually (see README)."
+  else
+    # Normalise to <host>/v1 with no trailing slash.
+    BIFROST_API_URL="${BIFROST_BASE_URL%/}"
+    case "$BIFROST_API_URL" in
+      */v1) ;;
+      *) BIFROST_API_URL="$BIFROST_API_URL/v1" ;;
+    esac
+    cat >> "$HERMES_HOME/config.yaml" <<BIFROST_EOF
+
+providers:
+  bifrost:
+    name: "Bifrost gateway"
+    api: "${BIFROST_API_URL}"
+    key_env: BIFROST_API_KEY
+    transport: chat_completions
+    default_model: "${BIFROST_DEFAULT_MODEL:-bedrock/global.anthropic.claude-opus-5-5}"
+    extra_headers:
+      x-bf-lh-app: "hermes-mentor"
+BIFROST_EOF
+    echo "[hermes-mentor] Bifrost provider added to config.yaml ($BIFROST_API_URL)."
+    if [ -z "${BIFROST_API_KEY:-}" ]; then
+      echo "[hermes-mentor] Warning: BIFROST_API_KEY is not set; Bifrost will reject requests (virtual_key_required)."
+    fi
+  fi
+fi
+
 # storage-cleanup.sh must live under $HERMES_HOME/scripts (the cron tool
 # only accepts job scripts relative to that dir) and be hermes-owned, since
 # the hermes user can't write into a root-owned scripts/ dir at runtime.
