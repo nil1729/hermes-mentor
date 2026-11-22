@@ -68,6 +68,21 @@ providers:
     key_env: BIFROST_API_KEY
     transport: chat_completions
     default_model: "${BIFROST_DEFAULT_MODEL:-bedrock/global.anthropic.claude-sonnet-5-5}"
+BIFROST_EOF
+    # Optional pinned model list (comma-separated). Hermes' /model picker probes
+    # GET /models with a ~1.5s budget; Bifrost's list can take longer and the
+    # picker then shows only default_model. Pinning skips the probe.
+    if [ -n "${BIFROST_MODELS:-}" ]; then
+      {
+        echo "    discover_models: false"
+        echo "    models:"
+        printf '%s' "$BIFROST_MODELS" | tr ',' '\n' | while IFS= read -r m; do
+          m=$(printf '%s' "$m" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          [ -n "$m" ] && echo "      - $m"
+        done
+      } >> "$HERMES_HOME/config.yaml"
+    fi
+    cat >> "$HERMES_HOME/config.yaml" <<'BIFROST_EOF'
     extra_headers:
       x-bf-lh-app: "hermes-mentor"
 BIFROST_EOF

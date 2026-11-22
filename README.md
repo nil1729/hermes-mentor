@@ -261,6 +261,7 @@ Adds a [Bifrost](https://github.com/maximhq/bifrost) gateway as a second, named 
 railway variable set BIFROST_BASE_URL="https://<your-bifrost-host>"   # /v1 is appended if missing
 railway variable set BIFROST_API_KEY="sk-bf-..."                       # the virtual key
 railway variable set BIFROST_DEFAULT_MODEL="bedrock/<alias-or-profile-id>"   # optional
+railway variable set BIFROST_MODELS="bedrock/<id-1>,bedrock/<id-2>,bedrock/<id-3>"   # optional, see below
 railway up -d      # or: railway service restart
 ```
 
@@ -280,6 +281,7 @@ providers:
 Use it in a chat with `/model custom:bifrost:bedrock/<alias-or-profile-id>`; switch back with `/model` to your normal provider. Check `railway service logs` for `Bifrost provider added to config.yaml`.
 
 Notes:
+- **`/model` shows only one model?** Hermes lists a custom endpoint by probing `GET /models` with a ~1.5s budget (5s for the full picker), and falls back to just `default_model` if the probe is slow or fails. Bifrost's list can be slower than that. Set `BIFROST_MODELS` (comma-separated) to pin the list and skip the probe (`discover_models: false`). The virtual key must still allow each model.
 - Model names are `<bifrost-provider>/<model>`, as Bifrost routes on that prefix.
 - Plain `chat_completions` through a gateway sends no Anthropic `cache_control` markers. For Claude via Bifrost, enable `prompt_cache.auto_inject` on that provider in Bifrost, otherwise long system prompts are re-billed in full each turn.
 
